@@ -33,6 +33,10 @@ from extreme_optimizer import (
 from ultra_optimizer import (
     UltraOptimizer, AutoLearningSystem
 )
+from mean_reversion_engine import (
+    MeanReversionAnalyzer, MeanReversionPredictor,
+    MeanReversionLearningEngine
+)
 import warnings
 import re
 from collections import defaultdict
@@ -261,6 +265,8 @@ if 'extreme_learning_engine' not in st.session_state:
     st.session_state.extreme_learning_engine = ExtremeLearningEngine()
 if 'auto_learning_system' not in st.session_state:
     st.session_state.auto_learning_system = AutoLearningSystem()
+if 'mean_reversion_engine' not in st.session_state:
+    st.session_state.mean_reversion_engine = MeanReversionLearningEngine()
 if 'learning_results' not in st.session_state:
     st.session_state.learning_results = None
 if 'super_learning_results' not in st.session_state:
@@ -269,6 +275,8 @@ if 'extreme_learning_results' not in st.session_state:
     st.session_state.extreme_learning_results = None
 if 'auto_learning_results' not in st.session_state:
     st.session_state.auto_learning_results = None
+if 'mean_reversion_results' not in st.session_state:
+    st.session_state.mean_reversion_results = None
 if 'learned_genome' not in st.session_state:
     st.session_state.learned_genome = None
 
@@ -324,12 +332,14 @@ with st.sidebar:
     
     # 回测参数
     st.markdown("### 🔄 回测参数")
-    backtest_periods = st.slider(
+    backtest_periods = st.number_input(
         "回测期数", 
         min_value=10, 
         max_value=500, 
         value=50,
-        help="用于历史回测的期数"
+        step=10,
+        help="用于历史回测的期数",
+        key="sidebar_backtest_periods"
     )
     
     backtest_top_k = st.slider(
@@ -344,13 +354,23 @@ with st.sidebar:
     
     # 历史记录
     st.markdown("### 📜 历史记录")
-    history_periods = st.slider(
-        "显示期数",
-        min_value=5,
-        max_value=100,
-        value=20,
-        help="历史记录查看的期数"
-    )
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        history_periods = st.number_input(
+            "显示期数",
+            min_value=10,
+            max_value=2000,
+            value=50,
+            step=10,
+            help="历史记录查看的期数（主界面可自定义输入）",
+            key="sidebar_history_periods"
+        )
+    with col2:
+        st.caption("快速")
+        if st.button("100期", key="quick_100"):
+            history_periods = 100
+        if st.button("365期", key="quick_365"):
+            history_periods = 365
 
 # ============================================================================
 # 主界面
@@ -895,15 +915,17 @@ with tabs[2]:
             "遗传算法模式 (v4.0) - 准确率90-93%",
             "超级学习模式 (v5.0) - 准确率95-96%",
             "极限优化模式 (v6.0) - 目标90%+",
-            "🤖 完全自动模式 (v7.0) - 强制90%+ ⭐⭐⭐最强推荐"
+            "🤖 完全自动模式 (v7.0) - 强制90%+ ⭐⭐⭐最强推荐",
+            "🔄 回归平均模式 (v8.0) - 大数定律规律发现 ⭐⭐⭐⭐⭐新增"
         ],
         index=3,
-        help="完全自动模式无需任何参数，强制达到90%+"
+        help="回归平均模式：从365期/600期大数据中发现号码趋向平均的规律"
     )
     
-    is_auto_mode = "完全自动" in learning_mode
-    is_extreme_mode = "极限" in learning_mode and not is_auto_mode
-    is_super_mode = "超级" in learning_mode and not is_auto_mode and not is_extreme_mode
+    is_mean_reversion = "回归平均" in learning_mode
+    is_auto_mode = "完全自动" in learning_mode and not is_mean_reversion
+    is_extreme_mode = "极限" in learning_mode and not is_auto_mode and not is_mean_reversion
+    is_super_mode = "超级" in learning_mode and not is_auto_mode and not is_extreme_mode and not is_mean_reversion
     
     st.divider()
     
@@ -1007,6 +1029,108 @@ with tabs[2]:
             - 但对未来预测完全无效
             - 严禁用于实际投注！
             """)
+    
+    elif is_mean_reversion:
+        st.markdown("#### 🔄 回归平均模式 - 大数定律规律发现")
+        
+        st.success("""
+        **✨ 你的重要发现！**
+        
+        你观察到：在足够大的样本（365期、600期）中：
+        - 所有号码出现的概率都趋向于平均（约1/49）
+        - 大小、单双都趋向于50/50
+        - 波色趋向于33.33%/33.33%/33.33%
+        
+        这不是真正随机，而是"回归平均"（Regression to the Mean）！
+        """)
+        
+        st.info("""
+        **🎯 回归平均原理：**
+        
+        1. **偏离与回归**
+           - 当某个号码出现次数少于平均，它在未来更可能出现（回归压力）
+           - 当某个属性偏离理论值，它会趋向回归到理论值
+        
+        2. **大数定律**
+           - 样本越大，各种统计值越接近理论值
+           - 365期、600期是很好的观察窗口
+        
+        3. **预测策略**
+           - 找出当前偏离最大的号码/属性
+           - 预测它们会"回归"到平均水平
+        """)
+        
+        st.divider()
+        
+        st.markdown("##### 📊 参数配置")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**分析期数范围**")
+            mean_reversion_min_periods = st.number_input(
+                "最小分析期数",
+                min_value=200,
+                max_value=500,
+                value=200,
+                step=50,
+                help="寻找最优配置的起点"
+            )
+            
+            mean_reversion_max_periods = st.number_input(
+                "最大分析期数",
+                min_value=300,
+                max_value=800,
+                value=800,
+                step=50,
+                help="系统会测试200-800期，找到最优配置"
+            )
+        
+        with col2:
+            st.markdown("**回测验证**")
+            mean_reversion_test_periods = st.number_input(
+                "回测期数",
+                min_value=50,
+                max_value=300,
+                value=100,
+                step=10,
+                help="用于验证不同配置的准确率",
+                key="mean_reversion_test"
+            )
+            
+            st.caption("系统会测试多个分析期数：")
+            st.caption("200, 300, 365, 400, 500, 600, 700, 800")
+        
+        # 计算数据需求
+        if st.session_state.data is not None:
+            available_data = len(st.session_state.data)
+            needed_data = mean_reversion_max_periods + mean_reversion_test_periods + 50
+            if available_data >= needed_data:
+                st.success(f"✅ 数据充足：共{available_data}期，可进行完整学习")
+            else:
+                st.warning(f"⚠️ 数据建议：共{available_data}期，建议至少{needed_data}期以获得最佳效果")
+        
+        st.warning("""
+        **⚠️ 重要提醒：回归平均 ≠ 能预测下一期**
+        
+        - 回归平均是真实统计现象 ✓
+        - 但它只描述长期趋势 ✓
+        - **不能预测具体的下一期** ✗
+        
+        为什么？
+        - 回归平均说：1000期后会接近平均
+        - 但不说第1001期会是什么
+        - 每一期仍然是随机的
+        
+        所以：
+        - 这个模式可以帮你理解大数定律
+        - 可以验证回归平均现象
+        - 但历史准确率仍是过拟合
+        - 对未来投注无效！
+        """)
+        
+        # 保存参数
+        learning_test_periods = mean_reversion_test_periods
     
     elif is_extreme_mode:
         st.markdown("#### 🔥 极限优化参数")
@@ -1202,6 +1326,9 @@ with tabs[2]:
                 if is_auto_mode:
                     st.info(f"🤖 完全自动学习启动中，强制达到90%+（回测{auto_test_periods}期）...")
                     st.warning("⚠️ 这可能需要10-20分钟，系统会自动完成所有优化")
+                elif is_mean_reversion:
+                    st.info("🔄 回归平均学习启动中，寻找最优分析期数...")
+                    st.warning("⚠️ 这可能需要5-15分钟，系统会测试多个配置")
                 elif is_extreme_mode:
                     st.info(f"🔥 极限优化引擎启动中，目标{target_accuracy}%准确率...")
                     st.warning("⚠️ 这可能需要5-20分钟，系统会迭代优化直到达到目标")
@@ -1238,6 +1365,48 @@ with tabs[2]:
                         
                         # 保存学习结果
                         st.session_state.auto_learning_results = learning_results
+                    
+                    elif is_mean_reversion:
+                        # 回归平均模式
+                        status_text.text("🔄 启动回归平均学习 - 寻找最优配置...")
+                        progress_bar.progress(10)
+                        
+                        # 运行回归平均学习
+                        learning_results = st.session_state.mean_reversion_engine.auto_learn(
+                            st.session_state.data,
+                            min_analysis_periods=mean_reversion_min_periods,
+                            max_analysis_periods=mean_reversion_max_periods,
+                            test_periods=mean_reversion_test_periods,
+                            verbose=False
+                        )
+                        
+                        progress_bar.progress(100)
+                        
+                        if learning_results['success']:
+                            status_text.text("✓ 找到最优配置！")
+                            st.success(f"🎉 回归平均学习成功！最优分析期数: {learning_results['best_analysis_periods']}期，准确率: {learning_results['accuracy']*100:.2f}%")
+                            
+                            # 显示详细结果
+                            st.info(f"""
+                            **学习结果：**
+                            - 最优分析期数：{learning_results['best_analysis_periods']}期
+                            - 回测准确率：{learning_results['accuracy']*100:.2f}%
+                            - 理论随机：77.55%
+                            - 超越随机：+{(learning_results['accuracy']-0.7755)*100:.2f}%
+                            
+                            **解释：**
+                            系统测试了多个分析期数（200-800期），找到了在{learning_results['best_analysis_periods']}期分析窗口下，
+                            "回归平均"策略的准确率最高。
+                            
+                            **⚠️ 这仍然是过拟合！**
+                            虽然回归平均是真实现象，但它不能预测下一期的具体结果。
+                            """)
+                        else:
+                            status_text.text("⚠️ 学习完成但效果一般")
+                            st.warning("学习完成，但准确率可能不理想")
+                        
+                        # 保存学习结果
+                        st.session_state.mean_reversion_results = learning_results
                     
                     elif is_extreme_mode:
                         # 极限优化模式
@@ -1317,7 +1486,10 @@ with tabs[2]:
     display_results = None
     results_mode = None
     
-    if st.session_state.auto_learning_results:
+    if st.session_state.mean_reversion_results:
+        display_results = st.session_state.mean_reversion_results
+        results_mode = "mean_reversion"
+    elif st.session_state.auto_learning_results:
         display_results = st.session_state.auto_learning_results
         results_mode = "auto"
     elif st.session_state.extreme_learning_results:
@@ -1333,7 +1505,9 @@ with tabs[2]:
     if display_results:
         st.divider()
         
-        if results_mode == "auto":
+        if results_mode == "mean_reversion":
+            st.subheader("🔄 回归平均学习结果")
+        elif results_mode == "auto":
             st.subheader("🤖 完全自动学习结果")
         elif results_mode == "extreme":
             st.subheader("🔥 极限优化结果")
@@ -1346,7 +1520,13 @@ with tabs[2]:
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            if results_mode == "auto":
+            if results_mode == "mean_reversion":
+                st.metric(
+                    "最优分析期数",
+                    f"{display_results['best_analysis_periods']}期",
+                    help="系统找到的最优回归分析窗口"
+                )
+            elif results_mode == "auto":
                 st.metric(
                     "最终准确率",
                     f"{display_results['accuracy']*100:.2f}%",
@@ -1372,7 +1552,14 @@ with tabs[2]:
                 )
         
         with col2:
-            if results_mode == "auto":
+            if results_mode == "mean_reversion":
+                st.metric(
+                    "回测准确率",
+                    f"{display_results['accuracy']*100:.2f}%",
+                    delta=f"+{(display_results['accuracy']-0.7755)*100:.2f}%",
+                    help="在最优配置下的回测准确率（相对于77.55%随机）"
+                )
+            elif results_mode == "auto":
                 st.metric(
                     "迭代次数",
                     f"{display_results['iterations']}次",
@@ -1399,7 +1586,15 @@ with tabs[2]:
         
         with col3:
             theory_rate = 38 / 49 * 100
-            if results_mode == "auto":
+            if results_mode == "mean_reversion":
+                # 显示测试的配置数量
+                tested_configs = len(display_results.get('results_history', []))
+                st.metric(
+                    "测试配置",
+                    f"{tested_configs}个",
+                    help=f"系统测试了{tested_configs}个不同的分析期数配置"
+                )
+            elif results_mode == "auto":
                 delta = display_results['accuracy']*100 - theory_rate
                 status_icon = "✅" if display_results.get('success', False) else "⚠️"
                 st.metric(
@@ -1465,8 +1660,148 @@ with tabs[2]:
         
         st.divider()
         
-        # 学习到的参数（非extreme和auto模式）
-        if results_mode not in ["extreme", "auto"]:
+        # 回归平均模式的专属展示
+        if results_mode == "mean_reversion":
+            # 显示配置测试结果
+            with st.expander("📊 查看不同配置的测试结果", expanded=True):
+                st.markdown("#### 不同分析期数的准确率对比")
+                
+                results_history = display_results.get('results_history', [])
+                if results_history:
+                    # 创建数据表
+                    history_df = pd.DataFrame(results_history)
+                    
+                    # 绘制图表
+                    fig = px.line(
+                        history_df,
+                        x='analysis_periods',
+                        y='accuracy',
+                        title='',
+                        markers=True,
+                        labels={'analysis_periods': '分析期数', 'accuracy': '准确率'}
+                    )
+                    fig.update_traces(line_color='#3b82f6', marker=dict(size=10, color='#ec4899'))
+                    fig.update_layout(height=400)
+                    fig.add_hline(
+                        y=0.7755, 
+                        line_dash="dash", 
+                        line_color="gray",
+                        annotation_text="理论随机 77.55%"
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # 显示数据表
+                    st.markdown("#### 详细数据")
+                    display_df = history_df.copy()
+                    display_df['准确率(%)'] = display_df['accuracy'] * 100
+                    display_df['分析期数'] = display_df['analysis_periods']
+                    display_df['超越随机'] = (display_df['accuracy'] - 0.7755) * 100
+                    
+                    st.dataframe(
+                        display_df[['分析期数', '准确率(%)', '超越随机']].style.format({
+                            '准确率(%)': '{:.2f}%',
+                            '超越随机': '+{:.2f}%'
+                        }),
+                        use_container_width=True
+                    )
+                    
+                    st.success(f"""
+                    **✨ 关键发现：**
+                    - 最优分析期数：{display_results['best_analysis_periods']}期
+                    - 在这个窗口下，回归平均策略效果最好
+                    - 这验证了大数定律：合适的样本量很重要
+                    """)
+            
+            # 显示当前偏离分析
+            with st.expander("🔍 查看当前数据的偏离分析", expanded=False):
+                st.markdown("#### 号码偏离分析")
+                st.info("""
+                **偏离度说明：**
+                - 负偏离：出现次数少于期望，有"回归压力"
+                - 正偏离：出现次数多于期望，已超预期
+                - 偏离度越大（绝对值），回归压力越大
+                """)
+                
+                try:
+                    deviation_analysis = st.session_state.mean_reversion_engine.get_deviation_analysis(
+                        st.session_state.data
+                    )
+                    
+                    number_dev = deviation_analysis['number_deviations']
+                    
+                    # 创建偏离数据
+                    dev_data = []
+                    for num in range(1, 50):
+                        dev_data.append({
+                            '号码': num,
+                            '实际次数': number_dev[num]['actual_count'],
+                            '期望次数': f"{number_dev[num]['expected_count']:.1f}",
+                            '偏离度(%)': f"{number_dev[num]['deviation_ratio']*100:.1f}",
+                            '回归压力': number_dev[num]['reversion_pressure']
+                        })
+                    
+                    dev_df = pd.DataFrame(dev_data)
+                    
+                    # 按回归压力排序，显示TOP 20
+                    top_20 = dev_df.nlargest(20, '回归压力')
+                    
+                    st.markdown("**TOP 20 回归压力最大的号码（最可能出现）**")
+                    st.dataframe(top_20, use_container_width=True)
+                    
+                    # 属性偏离
+                    st.markdown("#### 属性偏离分析")
+                    attr_dev = deviation_analysis['attribute_deviations']
+                    
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.markdown("**大小分布**")
+                        big_data = attr_dev['big_small']['big']
+                        small_data = attr_dev['big_small']['small']
+                        st.metric(
+                            "大数",
+                            f"{big_data['count']}次 ({big_data['ratio']*100:.1f}%)",
+                            delta=f"偏离: {big_data['deviation']*100:+.1f}%"
+                        )
+                        st.metric(
+                            "小数",
+                            f"{small_data['count']}次 ({small_data['ratio']*100:.1f}%)",
+                            delta=f"偏离: {small_data['deviation']*100:+.1f}%"
+                        )
+                    
+                    with col2:
+                        st.markdown("**单双分布**")
+                        odd_data = attr_dev['odd_even']['odd']
+                        even_data = attr_dev['odd_even']['even']
+                        st.metric(
+                            "单数",
+                            f"{odd_data['count']}次 ({odd_data['ratio']*100:.1f}%)",
+                            delta=f"偏离: {odd_data['deviation']*100:+.1f}%"
+                        )
+                        st.metric(
+                            "双数",
+                            f"{even_data['count']}次 ({even_data['ratio']*100:.1f}%)",
+                            delta=f"偏离: {even_data['deviation']*100:+.1f}%"
+                        )
+                    
+                    with col3:
+                        st.markdown("**波色分布**")
+                        red_data = attr_dev['color']['red']
+                        blue_data = attr_dev['color']['blue']
+                        green_data = attr_dev['color']['green']
+                        st.metric(
+                            "红波",
+                            f"{red_data['count']}次 ({red_data['ratio']*100:.1f}%)",
+                            delta=f"偏离: {red_data['deviation']*100:+.1f}%"
+                        )
+                        st.caption(f"蓝波: {blue_data['count']}次 ({blue_data['ratio']*100:.1f}%)")
+                        st.caption(f"绿波: {green_data['count']}次 ({green_data['ratio']*100:.1f}%)")
+                    
+                except Exception as e:
+                    st.error(f"无法获取偏离分析: {str(e)}")
+        
+        # 学习到的参数（非extreme、auto和mean_reversion模式）
+        elif results_mode not in ["extreme", "auto"]:
             with st.expander("🔍 查看学习到的最优参数", expanded=False):
                 genome = display_results.get('best_genome', {})
                 
@@ -1643,9 +1978,344 @@ with tabs[2]:
                 key="learned_top_k"
             )
         
+        st.divider()
+        
+        # 新增：查看近100期的详细预测结果
+        with st.expander("📊 查看近100期的详细预测结果", expanded=False):
+            st.markdown("#### 🎯 历史预测验证")
+            st.info("""
+            **功能说明：**
+            使用当前学习到的模型，对历史最近100期数据进行逐期预测，
+            可以看到每一期的预测号码和实际命中情况。
+            
+            **⚠️ 注意：**
+            这是在已知结果的历史数据上的"回测"，与实际预测未来完全不同。
+            """)
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                backtest_periods_detail = st.number_input(
+                    "查看期数",
+                    min_value=10,
+                    max_value=200,
+                    value=100,
+                    step=10,
+                    help="查看最近多少期的详细预测结果",
+                    key="backtest_detail_periods"
+                )
+            
+            with col2:
+                backtest_top_k_detail = st.number_input(
+                    "每期预测号码数",
+                    min_value=1,
+                    max_value=49,
+                    value=38,
+                    help="每期预测多少个号码",
+                    key="backtest_detail_topk"
+                )
+            
+            with col3:
+                use_anti_loss = st.checkbox(
+                    "启用防连错机制",
+                    value=False,
+                    help="启用后，上期失败会调整预测策略",
+                    key="use_anti_loss"
+                )
+            
+            # 防连错模式选择
+            if use_anti_loss:
+                anti_loss_mode = st.selectbox(
+                    "防连错策略",
+                    options=[
+                        "用户方案：失败→跳过前10个",
+                        "动态调整：根据连错次数调整",
+                        "混合策略：模型+冷号混合",
+                        "自适应：调整预测窗口"
+                    ],
+                    index=0,
+                    help="选择防连错的具体策略",
+                    key="anti_loss_mode_select"
+                )
+                
+                # 映射到代码中的mode
+                mode_mapping = {
+                    "用户方案：失败→跳过前10个": "user_proposed",
+                    "动态调整：根据连错次数调整": "dynamic",
+                    "混合策略：模型+冷号混合": "mixed",
+                    "自适应：调整预测窗口": "adaptive"
+                }
+                anti_loss_mode_code = mode_mapping[anti_loss_mode]
+                
+                st.info(f"""
+                **{anti_loss_mode}**
+                
+                {'**原理：** 上期失败 → 本期跳过前10个号码，使用11-49位' if anti_loss_mode_code == 'user_proposed' else ''}
+                {'**原理：** 连错0-1次正常，2次跳5个，3次跳10个，4次及以上随机' if anti_loss_mode_code == 'dynamic' else ''}
+                {'**原理：** 根据连错次数调整模型和冷号的混合比例' if anti_loss_mode_code == 'mixed' else ''}
+                {'**原理：** 根据连错情况动态调整预测窗口范围' if anti_loss_mode_code == 'adaptive' else ''}
+                """)
+            
+            if st.button("🔍 生成详细预测结果", use_container_width=True, key="generate_detail_backtest"):
+                with st.spinner(f"正在生成最近{backtest_periods_detail}期的详细预测..."):
+                    try:
+                        # 导入防连错引擎（如果启用）
+                        if use_anti_loss:
+                            from anti_consecutive_loss import AntiConsecutiveLossPredictor
+                        
+                        # 准备存储结果
+                        detail_results = []
+                        detail_results_no_anti = []  # 对比用：不使用防连错的结果
+                        
+                        # 获取数据
+                        data = st.session_state.data
+                        start_idx = len(data) - backtest_periods_detail
+                        
+                        # 创建防连错预测器（如果启用）
+                        if use_anti_loss:
+                            # 根据results_mode选择基础预测器
+                            if results_mode == "mean_reversion":
+                                base_predictor = st.session_state.mean_reversion_engine
+                            elif results_mode == "auto":
+                                base_predictor = st.session_state.auto_learning_system
+                            elif results_mode == "extreme":
+                                base_predictor = st.session_state.extreme_learning_engine
+                            elif results_mode == "super":
+                                base_predictor = st.session_state.super_learning_engine
+                            else:
+                                base_predictor = st.session_state.learning_engine
+                            
+                            anti_loss_predictor = AntiConsecutiveLossPredictor(
+                                base_predictor, 
+                                mode=anti_loss_mode_code
+                            )
+                        
+                        # 创建进度条
+                        progress_bar = st.progress(0)
+                        
+                        # 逐期预测
+                        for i, idx in enumerate(range(start_idx, len(data))):
+                            # 更新进度
+                            progress_bar.progress((i + 1) / backtest_periods_detail)
+                            
+                            # 训练数据（到当前期之前）
+                            train_data = data.iloc[:idx]
+                            
+                            # 实际结果
+                            actual = data.iloc[idx]['特码']
+                            period = data.iloc[idx]['期号']
+                            
+                            # 根据模式进行预测
+                            try:
+                                if use_anti_loss:
+                                    # 使用防连错预测
+                                    predicted_nums, info = anti_loss_predictor.predict(train_data, top_k=backtest_top_k_detail)
+                                    strategy_used = info.get('strategy', '默认')
+                                    consecutive_losses = info.get('consecutive_losses', 0)
+                                    
+                                    # 同时生成不使用防连错的预测（对比）
+                                    if results_mode == "mean_reversion":
+                                        pred_list = st.session_state.mean_reversion_engine.predict(train_data, top_k=backtest_top_k_detail)
+                                        predicted_nums_no_anti = [p['号码'] for p in pred_list]
+                                    elif results_mode == "auto":
+                                        predicted_nums_no_anti = st.session_state.auto_learning_system.predict(train_data, top_k=backtest_top_k_detail)
+                                    elif results_mode == "extreme":
+                                        predicted_nums_no_anti = st.session_state.extreme_learning_engine.predict(train_data, top_k=backtest_top_k_detail)
+                                    elif results_mode == "super":
+                                        predicted_nums_no_anti = st.session_state.super_learning_engine.predict_ultra(train_data, top_k=backtest_top_k_detail)
+                                    else:
+                                        predicted_nums_no_anti = st.session_state.learning_engine.predict_with_learned_rules(train_data, top_k=backtest_top_k_detail)
+                                    
+                                    hit_no_anti = actual in predicted_nums_no_anti
+                                    
+                                else:
+                                    # 不使用防连错
+                                    if results_mode == "mean_reversion":
+                                        pred_list = st.session_state.mean_reversion_engine.predict(train_data, top_k=backtest_top_k_detail)
+                                        predicted_nums = [p['号码'] for p in pred_list]
+                                    elif results_mode == "auto":
+                                        predicted_nums = st.session_state.auto_learning_system.predict(train_data, top_k=backtest_top_k_detail)
+                                    elif results_mode == "extreme":
+                                        predicted_nums = st.session_state.extreme_learning_engine.predict(train_data, top_k=backtest_top_k_detail)
+                                    elif results_mode == "super":
+                                        predicted_nums = st.session_state.super_learning_engine.predict_ultra(train_data, top_k=backtest_top_k_detail)
+                                    else:
+                                        predicted_nums = st.session_state.learning_engine.predict_with_learned_rules(train_data, top_k=backtest_top_k_detail)
+                                    
+                                    strategy_used = "标准预测"
+                                    consecutive_losses = 0
+                                
+                                # 判断命中
+                                hit = actual in predicted_nums
+                                
+                                # 更新防连错预测器的历史
+                                if use_anti_loss:
+                                    anti_loss_predictor.update_history(predicted_nums, actual)
+                                
+                                # 格式化预测号码显示（只显示前10个）
+                                if len(predicted_nums) <= 10:
+                                    pred_display = ','.join([f"{n:02d}" for n in predicted_nums])
+                                else:
+                                    pred_display = ','.join([f"{n:02d}" for n in predicted_nums[:10]]) + f'...({len(predicted_nums)}个)'
+                                
+                                # 保存结果
+                                result_dict = {
+                                    '期号': period,
+                                    '预测号码': pred_display,
+                                    '实际特码': f"{actual:02d}",
+                                    '命中': '✓' if hit else '✗',
+                                    '预测数量': len(predicted_nums)
+                                }
+                                
+                                if use_anti_loss:
+                                    result_dict['连错次数'] = consecutive_losses
+                                    result_dict['策略'] = strategy_used
+                                    result_dict['标准命中'] = '✓' if hit_no_anti else '✗'
+                                
+                                detail_results.append(result_dict)
+                            except Exception as e:
+                                # 如果某期预测失败，记录错误
+                                detail_results.append({
+                                    '期号': period,
+                                    '预测号码': '预测失败',
+                                    '实际特码': f"{actual:02d}",
+                                    '命中': '✗',
+                                    '预测数量': 0
+                                })
+                        
+                        progress_bar.empty()
+                        
+                        # 转换为DataFrame
+                        results_df = pd.DataFrame(detail_results)
+                        
+                        # 计算统计
+                        total_tests = len(results_df)
+                        hit_count = (results_df['命中'] == '✓').sum()
+                        accuracy = hit_count / total_tests * 100 if total_tests > 0 else 0
+                        
+                        # 显示统计
+                        st.success(f"✓ 详细预测完成！")
+                        
+                        if use_anti_loss:
+                            # 计算防连错效果统计
+                            anti_loss_stats = anti_loss_predictor.get_statistics()
+                            
+                            # 计算标准预测的统计（对比）
+                            standard_hit_count = (results_df['标准命中'] == '✓').sum()
+                            standard_accuracy = standard_hit_count / total_tests * 100 if total_tests > 0 else 0
+                            
+                            # 计算标准预测的最大连错
+                            standard_max_consecutive = 0
+                            current_consecutive = 0
+                            for hit in results_df['标准命中']:
+                                if hit == '✗':
+                                    current_consecutive += 1
+                                    standard_max_consecutive = max(standard_max_consecutive, current_consecutive)
+                                else:
+                                    current_consecutive = 0
+                            
+                            st.markdown("### 🎯 防连错效果对比")
+                            
+                            col1, col2, col3 = st.columns(3)
+                            
+                            with col1:
+                                st.markdown("**防连错预测**")
+                                st.metric("测试期数", f"{total_tests}期")
+                                st.metric("命中次数", f"{hit_count}次")
+                                st.metric("准确率", f"{accuracy:.2f}%")
+                                st.metric("最大连错", f"{anti_loss_stats.get('max_consecutive_losses', 0)}次", 
+                                         delta=f"减少{standard_max_consecutive - anti_loss_stats.get('max_consecutive_losses', 0)}次" if standard_max_consecutive > anti_loss_stats.get('max_consecutive_losses', 0) else None)
+                                st.metric("平均连错", f"{anti_loss_stats.get('avg_consecutive_losses', 0):.1f}次")
+                            
+                            with col2:
+                                st.markdown("**标准预测（对比）**")
+                                st.metric("测试期数", f"{total_tests}期")
+                                st.metric("命中次数", f"{standard_hit_count}次")
+                                st.metric("准确率", f"{standard_accuracy:.2f}%")
+                                st.metric("最大连错", f"{standard_max_consecutive}次")
+                                st.metric("连错次数", f"{anti_loss_stats.get('consecutive_loss_count', 0)}次")
+                            
+                            with col3:
+                                st.markdown("**改进效果**")
+                                accuracy_diff = accuracy - standard_accuracy
+                                max_loss_diff = standard_max_consecutive - anti_loss_stats.get('max_consecutive_losses', 0)
+                                
+                                st.metric("准确率提升", f"{accuracy_diff:+.2f}%",
+                                         delta="提升" if accuracy_diff > 0 else ("下降" if accuracy_diff < 0 else "持平"))
+                                st.metric("连错减少", f"{max_loss_diff}次",
+                                         delta="改进" if max_loss_diff > 0 else ("变差" if max_loss_diff < 0 else "持平"))
+                                
+                                theory_rate = backtest_top_k_detail / 49 * 100
+                                st.metric("理论随机", f"{theory_rate:.2f}%")
+                                st.metric("超越随机", f"{accuracy - theory_rate:+.2f}%")
+                            
+                            st.divider()
+                            
+                            # 防连错策略使用统计
+                            if '策略' in results_df.columns:
+                                st.markdown("#### 📊 策略使用统计")
+                                strategy_counts = results_df['策略'].value_counts()
+                                
+                                cols = st.columns(len(strategy_counts))
+                                for idx, (strategy, count) in enumerate(strategy_counts.items()):
+                                    with cols[idx]:
+                                        st.metric(strategy, f"{count}次", 
+                                                 delta=f"{count/total_tests*100:.1f}%")
+                        
+                        else:
+                            # 标准统计显示
+                            col1, col2, col3, col4 = st.columns(4)
+                            with col1:
+                                st.metric("测试期数", f"{total_tests}期")
+                            with col2:
+                                st.metric("命中次数", f"{hit_count}次")
+                            with col3:
+                                st.metric("准确率", f"{accuracy:.2f}%")
+                            with col4:
+                                theory_rate = backtest_top_k_detail / 49 * 100
+                                st.metric("理论随机", f"{theory_rate:.2f}%")
+                        
+                        st.divider()
+                        
+                        # 显示详细结果表格
+                        st.markdown("#### 📋 详细预测记录")
+                        
+                        # 高亮显示命中/未命中
+                        def highlight_result(row):
+                            if row['命中'] == '✓':
+                                return ['background-color: #dcfce7'] * len(row)  # 绿色
+                            else:
+                                return ['background-color: #fee2e2'] * len(row)  # 红色
+                        
+                        styled_df = results_df.style.apply(highlight_result, axis=1)
+                        st.dataframe(styled_df, use_container_width=True, height=600)
+                        
+                        # 提供下载
+                        csv = results_df.to_csv(index=False, encoding='utf-8-sig')
+                        st.download_button(
+                            label="📥 下载详细预测结果（CSV）",
+                            data=csv,
+                            file_name=f"详细预测结果_{backtest_periods_detail}期.csv",
+                            mime="text/csv"
+                        )
+                        
+                    except Exception as e:
+                        st.error(f"生成详细预测失败: {str(e)}")
+                        import traceback
+                        st.code(traceback.format_exc())
+        
+        st.divider()
+        
         if st.button("🔮 使用学习规律预测", use_container_width=True):
             try:
-                if results_mode == "auto":
+                if results_mode == "mean_reversion":
+                    # 使用回归平均引擎预测
+                    learned_prediction_list = st.session_state.mean_reversion_engine.predict(
+                        st.session_state.data,
+                        top_k=predict_top_k
+                    )
+                    # 提取号码列表
+                    learned_prediction = [p['号码'] for p in learned_prediction_list]
+                elif results_mode == "auto":
                     # 使用完全自动学习引擎预测
                     learned_prediction = st.session_state.auto_learning_system.predict(
                         st.session_state.data,
@@ -1677,6 +2347,34 @@ with tabs[2]:
                 
                 st.markdown("#### 预测号码")
                 st.code(numbers_text, language=None)
+                
+                # 回归平均模式显示详细信息
+                if results_mode == "mean_reversion":
+                    st.divider()
+                    st.markdown("#### 🔍 回归平均预测详情")
+                    
+                    st.info(f"""
+                    **预测原理：**
+                    基于最近{st.session_state.mean_reversion_engine.analysis_periods}期的数据分析，
+                    找出当前偏离平均最大的号码和属性，预测它们会"回归"到平均水平。
+                    
+                    **⚠️ 重要提醒：**
+                    回归平均是长期趋势，不能预测下一期的具体结果！
+                    """)
+                    
+                    # 显示TOP 10预测详情
+                    with st.expander("查看TOP 10预测详情", expanded=True):
+                        top_10_details = learned_prediction_list[:10]
+                        details_df = pd.DataFrame(top_10_details)
+                        st.dataframe(details_df, use_container_width=True)
+                        
+                        st.caption("""
+                        **说明：**
+                        - 回归分数：负值越大，回归压力越大，理论上越可能出现
+                        - 实际次数：在分析期内的实际出现次数
+                        - 期望次数：理论上应该出现的次数
+                        - 偏离度：实际相对期望的偏离百分比
+                        """)
                 
                 # 一键复制
                 if st.button("📋 复制预测号码", key="copy_learned"):
@@ -1772,7 +2470,7 @@ with tabs[5]:
     
     backtest_type = st.selectbox(
         "选择回测类型",
-        options=['AI融合预测', '特码TOP1', '特码TOP3', '特码TOP5', '特码TOP10', '大小', '单双', '波色'],
+        options=['AI融合预测', 'Transformer深度学习', '特码TOP1', '特码TOP3', '特码TOP5', '特码TOP10', '大小', '单双', '波色'],
         index=0
     )
     
@@ -1799,6 +2497,22 @@ with tabs[5]:
                     )
                 
                 # 使用自定义回测函数以支持任意top_k
+                result = run_flexible_backtest(
+                    st.session_state.data,
+                    predict_func,
+                    test_periods=backtest_periods,
+                    top_k=backtest_top_k
+                )
+            elif backtest_type == 'Transformer深度学习':
+                # Transformer深度学习回测
+                def predict_func(train_data):
+                    # 创建Transformer模型实例
+                    transformer = TransformerModel()
+                    # 调用predict方法
+                    transformer_result = transformer.predict(train_data, top_k=backtest_top_k)
+                    # 返回predictions列表
+                    return transformer_result['predictions']
+                
                 result = run_flexible_backtest(
                     st.session_state.data,
                     predict_func,
@@ -1886,40 +2600,129 @@ with tabs[5]:
             st.dataframe(styled_df, use_container_width=True)
 
 with tabs[6]:
-    st.subheader(f"📜 历史记录查看（最近 {history_periods} 期）")
+    st.subheader("📜 历史记录查看")
     
-    history_df = HistoryViewer.get_recent_history(st.session_state.data, history_periods)
+    # 自定义期数输入
+    st.markdown("#### 🎯 自定义查看期数")
+    col1, col2, col3 = st.columns([2, 2, 1])
+    
+    with col2:
+        # 快速选择按钮（放在前面，先处理）
+        quick_select = st.selectbox(
+            "快速选择",
+            options=["最近100期", "自定义", "最近30期", "最近50期", "最近200期", "最近365期", "最近500期", "全部数据"],
+            index=0,  # 默认选择"最近100期"
+            key="history_quick_select"
+        )
+        
+        # 根据快速选择设置默认值
+        if quick_select == "全部数据" and st.session_state.data is not None:
+            default_periods = len(st.session_state.data)
+        elif quick_select == "自定义":
+            # 自定义时使用侧边栏的值，但确保至少100期
+            default_periods = max(100, history_periods)
+        else:
+            default_periods = int(quick_select.replace("最近", "").replace("期", ""))
+    
+    with col1:
+        custom_history_periods = st.number_input(
+            "输入查看期数",
+            min_value=10,
+            max_value=2000,
+            value=default_periods,
+            step=10,
+            help="输入你想查看的期数，如365期",
+            key="custom_history_input"
+        )
+    
+    with col3:
+        if st.session_state.data is not None:
+            st.metric(
+                "数据总期数",
+                f"{len(st.session_state.data)}期"
+            )
+    
+    # 数据可用性检查
+    if st.session_state.data is not None:
+        available_periods = len(st.session_state.data)
+        if custom_history_periods > available_periods:
+            st.warning(f"⚠️ 请求{custom_history_periods}期，但只有{available_periods}期数据。将显示全部{available_periods}期。")
+            custom_history_periods = available_periods
+        else:
+            st.success(f"✅ 将显示最近{custom_history_periods}期的历史记录和统计分析")
+    
+    st.divider()
+    
+    st.markdown(f"### 📋 历史记录（最近 {custom_history_periods} 期）")
+    
+    history_df = HistoryViewer.get_recent_history(st.session_state.data, custom_history_periods)
     st.dataframe(history_df, use_container_width=True, height=400)
     
     st.divider()
-    st.subheader(f"📊 历史统计分析（最近 {history_periods} 期）")
+    st.subheader(f"📊 历史统计分析（最近 {custom_history_periods} 期）")
     
-    history_stats = HistoryViewer.analyze_history(st.session_state.data, history_periods)
+    history_stats = HistoryViewer.analyze_history(st.session_state.data, custom_history_periods)
     
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.metric("大数次数", f"{history_stats['大数次数']} ({history_stats['大数次数']/history_periods*100:.1f}%)")
-        st.metric("小数次数", f"{history_stats['小数次数']} ({history_stats['小数次数']/history_periods*100:.1f}%)")
+        st.metric("大数次数", f"{history_stats['大数次数']} ({history_stats['大数次数']/custom_history_periods*100:.1f}%)")
+        st.metric("小数次数", f"{history_stats['小数次数']} ({history_stats['小数次数']/custom_history_periods*100:.1f}%)")
     
     with col2:
-        st.metric("单数次数", f"{history_stats['单数次数']} ({history_stats['单数次数']/history_periods*100:.1f}%)")
-        st.metric("双数次数", f"{history_stats['双数次数']} ({history_stats['双数次数']/history_periods*100:.1f}%)")
+        st.metric("单数次数", f"{history_stats['单数次数']} ({history_stats['单数次数']/custom_history_periods*100:.1f}%)")
+        st.metric("双数次数", f"{history_stats['双数次数']} ({history_stats['双数次数']/custom_history_periods*100:.1f}%)")
     
     with col3:
-        st.metric("红波次数", f"{history_stats['红波次数']} ({history_stats['红波次数']/history_periods*100:.1f}%)")
-        st.metric("蓝波次数", f"{history_stats['蓝波次数']} ({history_stats['蓝波次数']/history_periods*100:.1f}%)")
+        st.metric("红波次数", f"{history_stats['红波次数']} ({history_stats['红波次数']/custom_history_periods*100:.1f}%)")
+        st.metric("蓝波次数", f"{history_stats['蓝波次数']} ({history_stats['蓝波次数']/custom_history_periods*100:.1f}%)")
     
     with col4:
-        st.metric("绿波次数", f"{history_stats['绿波次数']} ({history_stats['绿波次数']/history_periods*100:.1f}%)")
+        st.metric("绿波次数", f"{history_stats['绿波次数']} ({history_stats['绿波次数']/custom_history_periods*100:.1f}%)")
         st.metric("平均特码", f"{history_stats['平均特码']:.2f}")
 
 with tabs[7]:
     st.subheader("📉 数据统计分析")
     
-    st.subheader("号码出现频率（最近100期）")
-    recent_100 = st.session_state.data['特码'].iloc[-100:]
-    freq = recent_100.value_counts().sort_index()
+    # 自定义期数输入
+    st.markdown("#### 🎯 自定义分析期数")
+    col1, col2 = st.columns([2, 2])
+    
+    with col1:
+        stats_periods = st.number_input(
+            "输入分析期数",
+            min_value=10,
+            max_value=2000,
+            value=100,
+            step=10,
+            help="输入你想分析的期数，如365期",
+            key="stats_periods"
+        )
+    
+    with col2:
+        # 快速选择
+        stats_quick = st.selectbox(
+            "快速选择",
+            options=["自定义", "最近30期", "最近50期", "最近100期", "最近200期", "最近365期"],
+            index=3,
+            key="stats_quick"
+        )
+        
+        if stats_quick != "自定义":
+            stats_periods = int(stats_quick.replace("最近", "").replace("期", ""))
+    
+    # 数据可用性检查
+    if st.session_state.data is not None:
+        available = len(st.session_state.data)
+        if stats_periods > available:
+            st.warning(f"⚠️ 请求{stats_periods}期，但只有{available}期数据。将分析全部{available}期。")
+            stats_periods = available
+    
+    st.divider()
+    
+    st.subheader(f"号码出现频率（最近{stats_periods}期）")
+    recent_data = st.session_state.data['特码'].iloc[-stats_periods:]
+    freq = recent_data.value_counts().sort_index()
     
     fig = px.bar(
         x=freq.index,
@@ -1934,11 +2737,13 @@ with tabs[7]:
     
     st.divider()
     
-    st.subheader("特码走势图（最近50期）")
-    recent_50 = st.session_state.data[['期号', '特码']].iloc[-50:]
+    # 走势图使用较少的期数以保持清晰
+    trend_periods = min(stats_periods, 100)
+    st.subheader(f"特码走势图（最近{trend_periods}期）")
+    recent_trend = st.session_state.data[['期号', '特码']].iloc[-trend_periods:]
     
     fig = px.line(
-        recent_50,
+        recent_trend,
         x='期号',
         y='特码',
         title='',
