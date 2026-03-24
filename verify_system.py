@@ -8,7 +8,7 @@ import sys
 import os
 
 print("="*70)
-print("🔍 AI彩票量化研究系统 v8.1 - 文件完整性检查")
+print("🔍 AI彩票量化研究系统 v8.2 - 文件完整性检查")
 print("="*70)
 print()
 
@@ -25,7 +25,8 @@ required_files = [
     'extreme_optimizer.py',
     'ultra_optimizer.py',
     'mean_reversion_engine.py',  # v8.0新增
-    'anti_consecutive_loss.py'    # v8.1新增
+    'anti_consecutive_loss.py',   # v8.1新增
+    'model_manager.py'            # v8.2新增
 ]
 
 all_files_exist = True
@@ -40,7 +41,7 @@ for filename in required_files:
 print()
 
 if not all_files_exist:
-    print("❌ 文件不完整！请确保所有9个核心文件都在同一文件夹中。")
+    print("❌ 文件不完整！请确保所有10个核心文件都在同一文件夹中。")
     sys.exit(1)
 
 print("✅ 所有核心文件完整！")

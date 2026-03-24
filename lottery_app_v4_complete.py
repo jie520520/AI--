@@ -37,6 +37,10 @@ from mean_reversion_engine import (
     MeanReversionAnalyzer, MeanReversionPredictor,
     MeanReversionLearningEngine
 )
+from model_manager import (
+    ModelManager, ensure_reproducibility, create_model_snapshot
+)
+from datetime import datetime
 import warnings
 import re
 from collections import defaultdict
@@ -279,6 +283,12 @@ if 'mean_reversion_results' not in st.session_state:
     st.session_state.mean_reversion_results = None
 if 'learned_genome' not in st.session_state:
     st.session_state.learned_genome = None
+if 'model_manager' not in st.session_state:
+    st.session_state.model_manager = ModelManager()
+if 'loaded_model_info' not in st.session_state:
+    st.session_state.loaded_model_info = None
+if 'random_seed' not in st.session_state:
+    st.session_state.random_seed = 42  # 默认随机种子
 
 # ============================================================================
 # 侧边栏
@@ -929,9 +939,136 @@ with tabs[2]:
     
     st.divider()
     
+    # 模型管理功能
+    with st.expander("📁 模型管理 - 保存/加载学习结果", expanded=False):
+        st.markdown("### 🎯 确保结果可重复性")
+        
+        st.info("""
+        **解决问题：每次运行结果不同**
+        
+        - 设置固定随机种子 → 确保相同参数得到相同结果
+        - 保存学习到的模型 → 不用每次重新学习
+        - 加载已保存模型 → 直接使用之前的最佳结果
+        """)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### 🔢 随机种子设置")
+            use_fixed_seed = st.checkbox(
+                "使用固定随机种子（确保可重复性）",
+                value=True,
+                help="勾选后，相同参数每次运行结果相同",
+                key="use_fixed_seed"
+            )
+            
+            if use_fixed_seed:
+                seed_value = st.number_input(
+                    "随机种子值",
+                    min_value=0,
+                    max_value=9999,
+                    value=st.session_state.random_seed,
+                    help="相同的种子值会产生相同的结果",
+                    key="seed_input"
+                )
+                st.session_state.random_seed = seed_value
+                
+                st.success(f"✓ 已设置随机种子: {seed_value}")
+                st.caption("相同数据+相同参数+相同种子 = 相同结果")
+            else:
+                st.warning("未使用固定种子，每次结果会不同")
+        
+        with col2:
+            st.markdown("#### 📥 加载已保存模型")
+            
+            # 获取模型模式映射
+            mode_mapping = {
+                "遗传算法": "genetic",
+                "超级学习": "super",
+                "极限优化": "extreme",
+                "完全自动": "auto",
+                "回归平均": "mean_reversion"
+            }
+            
+            # 确定当前模式
+            current_mode = None
+            for key, value in mode_mapping.items():
+                if key in learning_mode:
+                    current_mode = value
+                    break
+            
+            # 列出该模式的已保存模型
+            saved_models = st.session_state.model_manager.list_models(mode=current_mode)
+            
+            if saved_models:
+                st.caption(f"找到 {len(saved_models)} 个已保存的{learning_mode}模型")
+                
+                model_options = ["不加载，重新学习"] + [
+                    f"{m['model_name']} ({m['created_at'][:10]}) - 准确率{m['accuracy']}"
+                    for m in saved_models
+                ]
+                
+                selected_model = st.selectbox(
+                    "选择要加载的模型",
+                    options=model_options,
+                    key="model_select"
+                )
+                
+                if selected_model != "不加载，重新学习":
+                    model_index = model_options.index(selected_model) - 1
+                    model_info = saved_models[model_index]
+                    
+                    if st.button("🚀 加载此模型", use_container_width=True, key="load_model_btn"):
+                        try:
+                            loaded_data = st.session_state.model_manager.load_model(model_info['filepath'])
+                            st.session_state.loaded_model_info = loaded_data
+                            
+                            # 根据模式加载到对应的results
+                            if current_mode == "genetic":
+                                st.session_state.learning_results = loaded_data['model_data']
+                            elif current_mode == "super":
+                                st.session_state.super_learning_results = loaded_data['model_data']
+                            elif current_mode == "extreme":
+                                st.session_state.extreme_learning_results = loaded_data['model_data']
+                            elif current_mode == "auto":
+                                st.session_state.auto_learning_results = loaded_data['model_data']
+                            elif current_mode == "mean_reversion":
+                                st.session_state.mean_reversion_results = loaded_data['model_data']
+                            
+                            st.success(f"✓ 已加载模型：{model_info['model_name']}")
+                            st.info("向下滚动查看加载的模型结果，或直接使用预测功能")
+                        except Exception as e:
+                            st.error(f"加载失败：{str(e)}")
+            else:
+                st.caption("暂无已保存的模型")
+                st.caption("完成学习后可以保存模型")
+    
+    st.divider()
+    
     # 学习参数配置
     if is_auto_mode:
         st.markdown("#### 🤖 完全自动模式")
+        
+        # 添加醒目的回测警告
+        st.warning("""
+        ⚠️ **重要说明：这是历史数据回测，不是真实预测！**
+        
+        **回测的本质：**
+        - 在已知结果的历史数据上测试模型
+        - 相当于"开卷考试" - 已经知道答案
+        - 准确率再高也不能预测未来
+        
+        **为什么不能用于投注？**
+        - 模型在历史数据上"学习" → 记住了历史模式
+        - 在相同数据上"测试" → 当然准确率高
+        - 但对未来数据 → 准确率回到~78%（接近随机77.55%）
+        
+        **教育价值：**
+        - ✓ 理解机器学习的过拟合现象
+        - ✓ 认识历史回测的局限性
+        - ✓ 培养批判性思维
+        - ✗ 绝对不能用于实际投注
+        """)
         
         st.markdown("##### 📊 回测期数设置（关键参数）")
         st.error("""
@@ -1134,6 +1271,14 @@ with tabs[2]:
     
     elif is_extreme_mode:
         st.markdown("#### 🔥 极限优化参数")
+        
+        st.warning("""
+        ⚠️ **这是历史数据回测，不是真实预测！**
+        
+        极限优化会通过迭代调整权重，在历史数据上达到90%+准确率。
+        但这是"过拟合"，对未来预测无效。仅供学习理解机器学习原理。
+        """)
+        
         st.info("⚡ 极限模式会迭代优化权重，直到达到目标准确率或最大迭代次数")
         
         col1, col2, col3 = st.columns(3)
@@ -1220,6 +1365,14 @@ with tabs[2]:
     
     elif is_super_mode:
         st.markdown("#### 🚀 超级学习参数")
+        
+        st.warning("""
+        ⚠️ **这是历史数据回测，不是真实预测！**
+        
+        超级学习使用多种算法（粒子群、模拟退火等）优化参数。
+        历史准确率可达95%+，但这是过拟合，对未来无效。
+        """)
+        
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
@@ -1265,6 +1418,14 @@ with tabs[2]:
         st.info("⏱️ 超级学习预计耗时：10-15分钟（标准配置）")
     else:
         st.markdown("#### 🧬 遗传算法参数")
+        
+        st.warning("""
+        ⚠️ **这是历史数据回测，不是真实预测！**
+        
+        遗传算法通过"进化"优化参数，在历史数据上准确率可达90%+。
+        但这是模型"记住"了历史模式，对未来预测无效。
+        """)
+        
         col1, col2, col3 = st.columns(3)
         
         with col1:
@@ -1301,6 +1462,28 @@ with tabs[2]:
     
     st.divider()
     
+    # 统一的回测警告（所有模式）
+    st.error("""
+    🚨 **关键提醒：这是历史数据回测，不是真实预测！**
+    
+    **什么是回测？**
+    - 在已知结果的历史数据上测试模型
+    - 相当于"开卷考试" - 已经知道答案
+    - 模型会"记住"历史模式，所以准确率高
+    
+    **为什么对未来无效？**
+    - 历史模式≠未来规律
+    - 彩票每期独立随机
+    - 准确率高只是过拟合
+    - 实际预测准确率会回到~78%（接近随机77.55%）
+    
+    **这个功能的价值：**
+    ✓ 学习机器学习原理
+    ✓ 理解过拟合现象
+    ✓ 培养批判性思维
+    ✗ 绝对不能用于实际投注
+    """)
+    
     # 启动学习按钮
     if is_auto_mode:
         button_text = "🤖 一键自动学习（强制90%+）"
@@ -1319,6 +1502,11 @@ with tabs[2]:
         elif not is_auto_mode and len(st.session_state.data) < learning_test_periods + 100:
             st.error(f"数据不足！需要至少 {learning_test_periods + 100} 条记录")
         else:
+            # 设置随机种子（确保可重复性）
+            if st.session_state.get('use_fixed_seed', True):
+                ensure_reproducibility(st.session_state.random_seed)
+                st.info(f"🔢 已设置随机种子: {st.session_state.random_seed} - 确保结果可重复")
+            
             # 创建进度容器
             progress_container = st.container()
             
@@ -1985,11 +2173,17 @@ with tabs[2]:
             st.markdown("#### 🎯 历史预测验证")
             st.info("""
             **功能说明：**
-            使用当前学习到的模型，对历史最近100期数据进行逐期预测，
-            可以看到每一期的预测号码和实际命中情况。
+            使用当前学习到的模型，对历史最近100期数据进行逐期预测。
+            
+            **⚠️ 关键说明：**
+            - 回测使用的预测逻辑 = 手动预测的逻辑（完全一致）
+            - 每期都调用相同的 predict() 方法
+            - 不会为了"命中"而改变预测逻辑
+            - 这是真实的回测数据，不是强行命中
             
             **⚠️ 注意：**
             这是在已知结果的历史数据上的"回测"，与实际预测未来完全不同。
+            但回测的预测逻辑和手动预测完全相同。
             """)
             
             col1, col2, col3 = st.columns(3)
@@ -2151,11 +2345,8 @@ with tabs[2]:
                                 if use_anti_loss:
                                     anti_loss_predictor.update_history(predicted_nums, actual)
                                 
-                                # 格式化预测号码显示（只显示前10个）
-                                if len(predicted_nums) <= 10:
-                                    pred_display = ','.join([f"{n:02d}" for n in predicted_nums])
-                                else:
-                                    pred_display = ','.join([f"{n:02d}" for n in predicted_nums[:10]]) + f'...({len(predicted_nums)}个)'
+                                # 格式化预测号码显示（完整显示所有号码）
+                                pred_display = ','.join([f"{n:02d}" for n in predicted_nums])
                                 
                                 # 保存结果
                                 result_dict = {
@@ -2382,6 +2573,71 @@ with tabs[2]:
                 
             except Exception as e:
                 st.error(f"预测失败: {str(e)}")
+    
+    # 保存模型功能
+    if display_results:
+        st.divider()
+        st.markdown("### 💾 保存学习结果")
+        
+        st.info("""
+        **保存模型的好处：**
+        - ✓ 下次直接加载，不用重新学习
+        - ✓ 保存最佳配置，避免丢失
+        - ✓ 可以对比不同模型的效果
+        - ✓ 确保结果可重复性
+        """)
+        
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            model_name = st.text_input(
+                "模型名称",
+                value=f"{results_mode}_model_{datetime.now().strftime('%Y%m%d')}",
+                help="给这个模型起个名字",
+                key="save_model_name"
+            )
+            
+            model_description = st.text_input(
+                "模型描述（可选）",
+                value=f"准确率{display_results.get('accuracy', display_results.get('best_fitness', 0))*100:.2f}%",
+                help="简单描述这个模型的特点",
+                key="save_model_desc"
+            )
+        
+        with col2:
+            st.metric(
+                "当前准确率",
+                f"{display_results.get('accuracy', display_results.get('best_fitness', 0))*100:.2f}%",
+                help="这个模型在回测中的准确率"
+            )
+        
+        if st.button("💾 保存当前模型", type="primary", use_container_width=True, key="save_model_btn"):
+            try:
+                # 确定模式
+                mode_mapping = {
+                    "mean_reversion": "mean_reversion",
+                    "auto": "auto",
+                    "extreme": "extreme",
+                    "super": "super",
+                    "genetic": "genetic"
+                }
+                
+                save_mode = mode_mapping.get(results_mode, "generic")
+                
+                # 保存模型
+                filepath = st.session_state.model_manager.save_model(
+                    model_data=display_results,
+                    model_name=model_name,
+                    mode=save_mode,
+                    description=model_description
+                )
+                
+                st.success(f"✓ 模型已保存！")
+                st.info(f"保存路径：{filepath}")
+                st.caption("下次可以在「📁 模型管理」中加载此模型")
+                
+            except Exception as e:
+                st.error(f"保存失败：{str(e)}")
     
     # 学习说明
     st.divider()
