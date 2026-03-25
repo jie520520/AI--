@@ -48,6 +48,7 @@ import re
 from collections import defaultdict
 warnings.filterwarnings('ignore')
 
+
 # ============================================================================
 # 页面配置
 # ============================================================================
@@ -305,23 +306,32 @@ if 'data' not in st.session_state:
     st.session_state.data = None
 
 # --- 2. 侧边栏布局 ---
+# --- 1. 状态初始化 (必须放在最前面) ---
+if 'page' not in st.session_state:
+    st.session_state.page = 'home'
+if 'data' not in st.session_state:
+    st.session_state.data = None
+
+# --- 2. 侧边栏布局 (仅用于放置按钮和设置参数) ---
 with st.sidebar:
     st.markdown("### ⚙️ 系统设置")
-    st.info("免责声明：本系统仅供量化研究使用，不构成投资建议。")  # 假设 DISCLAIMER 内容
+    st.info("免责声明：本系统仅供量化研究使用，不构成投资建议。")
     st.divider()
 
-    # 导航按钮
+    # --- 导航按钮逻辑 ---
+    # 点击按钮修改 session_state.page 并立即触发重新运行
     if st.button("🏠 系统主页", use_container_width=True):
         st.session_state.page = "home"
+        st.rerun()
 
-    # 管理员功能
-    if is_admin():  # 确保你定义了 is_admin() 函数
+    if is_admin():
         if st.button("👥 用户管理", use_container_width=True):
             st.session_state.page = "user_management"
+            st.rerun()
 
     st.divider()
 
-    # 文件上传
+    # 文件上传 (保持不变)
     uploaded_file = st.file_uploader(
         "上传Excel数据文件",
         type=['xlsx', 'xlsm'],
@@ -331,7 +341,6 @@ with st.sidebar:
     if uploaded_file and st.session_state.data is None:
         with st.spinner("正在加载数据..."):
             try:
-                # 假设 DataProcessor 已经定义
                 df = pd.read_excel(uploaded_file, sheet_name='六合彩数据')
                 st.session_state.data = DataProcessor.parse_data(df)
                 st.success(f"✓ 成功加载 {len(st.session_state.data)} 条记录")
@@ -340,85 +349,53 @@ with st.sidebar:
 
     st.divider()
 
-    # 预测参数
+    # 预测参数与回测参数 (保持不变)
     st.markdown("### 🎯 预测参数")
-    fusion_top_k = st.slider(
-        "融合预测数量",
-        min_value=1,
-        max_value=49,
-        value=10,
-        help="AI融合模型预测的号码数量"
-    )
-
-    transformer_top_k = st.slider(
-        "Transformer预测数量",
-        min_value=1,
-        max_value=49,
-        value=10,
-        help="Transformer深度学习模型预测的号码数量"
-    )
+    fusion_top_k = st.slider("融合预测数量", 1, 49, 10)
+    transformer_top_k = st.slider("Transformer预测数量", 1, 49, 10)
 
     st.divider()
-
-    # 回测参数
     st.markdown("### 🔄 回测参数")
-    backtest_periods = st.number_input(
-        "回测期数",
-        min_value=10,
-        max_value=500,
-        value=50,
-        step=10,
-        help="用于历史回测的期数",
-        key="sidebar_backtest_periods"
-    )
-
-    backtest_top_k = st.slider(
-        "回测号码数量",
-        min_value=1,
-        max_value=49,
-        value=10,
-        help="用于回测的预测号码数量"
-    )
+    backtest_periods = st.number_input("回测期数", 10, 500, 50, step=10, key="sidebar_backtest_periods")
+    backtest_top_k = st.slider("回测号码数量", 1, 49, 10)
 
     st.divider()
-
-    # 历史记录
     st.markdown("### 📜 历史记录")
     col1, col2 = st.columns([2, 1])
     with col1:
-        history_periods = st.number_input(
-            "显示期数",
-            min_value=10,
-            max_value=2000,
-            value=50,
-            step=10,
-            help="历史记录查看的期数（主界面可自定义输入）",
-            key="sidebar_history_periods"
-        )
+        history_periods = st.number_input("显示期数", 10, 2000, 50, step=10, key="sidebar_history_periods")
     with col2:
         st.caption("快速")
-        if st.button("100期", key="quick_100"):
-            history_periods = 100
-        if st.button("365期", key="quick_365"):
-            history_periods = 365
+        if st.button("100期", key="quick_100"): history_periods = 100
+        if st.button("365期", key="quick_365"): history_periods = 365
+
+# --- 3. 主内容区渲染 (只保留这一份渲染逻辑) ---
+
+# --- 3. 主内容区渲染 ---
+
+# 分支 A: 用户管理页面
+if st.session_state.page == 'user_management':
+    st.title("👥 用户管理中心")
+    if is_admin():
+        show_user_management()
+    else:
+        st.error("权限不足")
+    st.stop()  # 🛑 关键：如果是管理页面，运行完这里就停止，不跑下面的 Home 逻辑
+
+# 分支 B: 系统主页逻辑
+elif st.session_state.page == 'home':
+    st.markdown('<h1 class="main-header">🧬 内部专用测试</h1>', unsafe_allow_html=True)
+
+    # 数据检查拦截器：防止 data 为 None 时触发下方的 Tabs 运算
+    if st.session_state.data is None:
+        st.info("💡 请先在左侧侧边栏上传 Excel 数据文件以开始分析。")
+        st.stop()  # 🛑 关键：数据没加载前，不执行下方的 Tabs 定义
 
 # ============================================================================
-# 主界面
+# 创建标签页 (这是你要求保留的唯一一组 Tabs 定义)
 # ============================================================================
-
-st.markdown('<h1 class="main-header">🧬 内部专用测试</h1>', unsafe_allow_html=True)
-
-# 检查是否已加载数据
-if st.session_state.data is None:
-    st.warning("请先在侧边栏上传Excel数据文件")
-    st.stop()
-
-# ============================================================================
-# 创建标签页
-# ============================================================================
-
 tabs = st.tabs([
-    "🎯 AI预测分析", 
+    "🎯 预测分析",
     "💰 虚拟助手",
     "🧬 核心功能",
     "🔧 特征工程",
@@ -427,6 +404,16 @@ tabs = st.tabs([
     "📜 历史记录",
     "📈 统计图表"
 ])
+
+# --- 以下是你原本各标签页内的业务逻辑 ---
+with tabs[0]:
+    st.write(" 预测模块已就绪")
+    # ... 原有预测代码 ...
+
+with tabs[6]:  # 📜 历史记录 (对应你这组定义的索引 6)
+    # 此时 data 绝对不是 None，HistoryViewer 不会再报 iloc 错误
+    history_df = HistoryViewer.get_recent_history(st.session_state.data, history_periods)
+    st.dataframe(history_df, use_container_width=True, height=400)
 
 # ============================================================================
 # 标签1: AI预测分析
@@ -939,8 +926,8 @@ with tabs[2]:
             "普通模式1 (v4.0) - 准确率90-93%",
             "普通模式2 (v5.0) - 准确率95-96%",
             "普通模式3 (v6.0) - 目标90%+",
-            "🤖 普通模式4 (v7.0) - 强制90%+ ⭐⭐⭐最强推荐",
-            "🔄 普通模式5 (v8.0) - 大数定律规律发现 ⭐⭐⭐⭐⭐新增"
+            "🤖 普通模式4 (v7.0) - 强制90%+ ⭐⭐⭐⭐⭐最强推荐",
+            "🔄 普通模式5 (v8.0) - 大数定律规律发现 ⭐⭐⭐新增"
         ],
         index=3,
         help="回归平均模式：从365期/600期大数据中发现号码趋向平均的规律"
@@ -2880,15 +2867,15 @@ with tabs[6]:
     st.divider()
     
     st.markdown(f"### 📋 历史记录（最近 {custom_history_periods} 期）")
-    
+
     history_df = HistoryViewer.get_recent_history(st.session_state.data, custom_history_periods)
     st.dataframe(history_df, use_container_width=True, height=400)
-    
+
     st.divider()
     st.subheader(f"📊 历史统计分析（最近 {custom_history_periods} 期）")
-    
+
     history_stats = HistoryViewer.analyze_history(st.session_state.data, custom_history_periods)
-    
+
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
@@ -2986,9 +2973,9 @@ with tabs[7]:
 st.divider()
 st.markdown("""
 <div style="text-align: center; color: #6b7280; padding: 2rem 0;">
-    <p><strong>AI彩票量化研究系统 Enhanced v3.0 完整版</strong></p>
-    <p>完整整合Tkinter版本功能 · 后置输入优先去重 · 属性自动分类 · 一键移动到档位</p>
-    <p>仅供教育和学术研究使用 · 请勿用于实际投注</p>
-    <p><strong>理性娱乐，远离赌博 🎓</strong></p>
+    <p><strong>量化研究系统完整版</strong></p>
+    <p>完整整合版本功能 · 后置输入优先去重 · 属性自动分类 · 一键移动到档位</p>
+    <p>仅供教育和学术研究使用 · 请勿用于实际</p>
+    <p><strong>好好学习，天天向上 🎓</strong></p>
 </div>
 """, unsafe_allow_html=True)
