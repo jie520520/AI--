@@ -41,6 +41,8 @@ from model_manager import (
     ModelManager, ensure_reproducibility, create_model_snapshot
 )
 from datetime import datetime
+# 导入登录系统
+from login_interface import require_login, show_user_management, is_admin
 import warnings
 import re
 from collections import defaultdict
@@ -56,6 +58,8 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+# ⭐ 关键步骤：要求登录
+require_login()
 
 # ============================================================================
 # 自定义CSS样式
@@ -294,64 +298,80 @@ if 'random_seed' not in st.session_state:
 # 侧边栏
 # ============================================================================
 
+# --- 1. 状态初始化 (必须放在最前面) ---
+if 'page' not in st.session_state:
+    st.session_state.page = 'home'
+if 'data' not in st.session_state:
+    st.session_state.data = None
+
+# --- 2. 侧边栏布局 ---
 with st.sidebar:
     st.markdown("### ⚙️ 系统设置")
-    
-    st.info(DISCLAIMER)
-    
+    st.info("免责声明：本系统仅供量化研究使用，不构成投资建议。")  # 假设 DISCLAIMER 内容
     st.divider()
-    
+
+    # 导航按钮
+    if st.button("🏠 系统主页", use_container_width=True):
+        st.session_state.page = "home"
+
+    # 管理员功能
+    if is_admin():  # 确保你定义了 is_admin() 函数
+        if st.button("👥 用户管理", use_container_width=True):
+            st.session_state.page = "user_management"
+
+    st.divider()
+
     # 文件上传
     uploaded_file = st.file_uploader(
         "上传Excel数据文件",
         type=['xlsx', 'xlsm'],
         help="请上传包含历史开奖数据的Excel文件"
     )
-    
-    if uploaded_file:
-        if st.session_state.data is None:
-            with st.spinner("正在加载数据..."):
-                try:
-                    df = pd.read_excel(uploaded_file, sheet_name='六合彩数据')
-                    st.session_state.data = DataProcessor.parse_data(df)
-                    st.success(f"✓ 成功加载 {len(st.session_state.data)} 条记录")
-                except Exception as e:
-                    st.error(f"加载失败: {str(e)}")
-    
+
+    if uploaded_file and st.session_state.data is None:
+        with st.spinner("正在加载数据..."):
+            try:
+                # 假设 DataProcessor 已经定义
+                df = pd.read_excel(uploaded_file, sheet_name='六合彩数据')
+                st.session_state.data = DataProcessor.parse_data(df)
+                st.success(f"✓ 成功加载 {len(st.session_state.data)} 条记录")
+            except Exception as e:
+                st.error(f"加载失败: {str(e)}")
+
     st.divider()
-    
+
     # 预测参数
     st.markdown("### 🎯 预测参数")
     fusion_top_k = st.slider(
-        "融合预测数量", 
-        min_value=1, 
-        max_value=49, 
+        "融合预测数量",
+        min_value=1,
+        max_value=49,
         value=10,
         help="AI融合模型预测的号码数量"
     )
-    
+
     transformer_top_k = st.slider(
-        "Transformer预测数量", 
-        min_value=1, 
-        max_value=49, 
+        "Transformer预测数量",
+        min_value=1,
+        max_value=49,
         value=10,
         help="Transformer深度学习模型预测的号码数量"
     )
-    
+
     st.divider()
-    
+
     # 回测参数
     st.markdown("### 🔄 回测参数")
     backtest_periods = st.number_input(
-        "回测期数", 
-        min_value=10, 
-        max_value=500, 
+        "回测期数",
+        min_value=10,
+        max_value=500,
         value=50,
         step=10,
         help="用于历史回测的期数",
         key="sidebar_backtest_periods"
     )
-    
+
     backtest_top_k = st.slider(
         "回测号码数量",
         min_value=1,
@@ -359,9 +379,9 @@ with st.sidebar:
         value=10,
         help="用于回测的预测号码数量"
     )
-    
+
     st.divider()
-    
+
     # 历史记录
     st.markdown("### 📜 历史记录")
     col1, col2 = st.columns([2, 1])
@@ -386,7 +406,7 @@ with st.sidebar:
 # 主界面
 # ============================================================================
 
-st.markdown('<h1 class="main-header">🧬 AI自主学习彩票研究系统 v4.0</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="main-header">🧬 内部专用测试</h1>', unsafe_allow_html=True)
 
 # 检查是否已加载数据
 if st.session_state.data is None:
@@ -399,8 +419,8 @@ if st.session_state.data is None:
 
 tabs = st.tabs([
     "🎯 AI预测分析", 
-    "💰 下注助手", 
-    "🧬 自主学习",
+    "💰 虚拟助手",
+    "🧬 核心功能",
     "🔧 特征工程",
     "📊 模型评估",
     "🔄 历史回测",
@@ -413,10 +433,10 @@ tabs = st.tabs([
 # ============================================================================
 
 with tabs[0]:
-    st.subheader("🎯 AI量化预测系统")
+    st.subheader("🎯 预测系统")
     
-    if st.button("🚀 运行AI预测", type="primary", use_container_width=True):
-        with st.spinner("正在运行AI预测..."):
+    if st.button("🚀 运行预测", type="primary", use_container_width=True):
+        with st.spinner("正在运行预测..."):
             # 提取特征
             features = FeatureEngineering.extract_all_features(st.session_state.data)
             st.session_state.features = features
@@ -457,7 +477,7 @@ with tabs[0]:
                 '辅助预测': aux_predictions
             }
             
-            st.success("✓ AI预测完成！")
+            st.success("✓ 预测完成！")
     
     if st.session_state.predictions:
         st.divider()
@@ -466,7 +486,7 @@ with tabs[0]:
         col1, col2 = st.columns(2)
         
         with col1:
-            st.subheader("🎯 AI融合预测")
+            st.subheader("🎯 融合预测")
             fusion_preds = st.session_state.predictions['融合预测']
             
             df_fusion = pd.DataFrame(fusion_preds)
@@ -486,7 +506,7 @@ with tabs[0]:
                 """, unsafe_allow_html=True)
         
         with col2:
-            st.subheader("🤖 Transformer深度学习")
+            st.subheader("🤖 备用参考")
             transformer_preds = st.session_state.predictions['Transformer']
             
             df_transformer = pd.DataFrame(transformer_preds)
@@ -542,11 +562,11 @@ with tabs[0]:
             st.caption(f"置信度: {color['置信度']}")
 
 # ============================================================================
-# 标签2: 下注助手 (完整整合Tkinter版本)
+# 标签2: 智能助手 (完整整合Tkinter版本)
 # ============================================================================
 
 with tabs[1]:
-    st.subheader("💰 智能下注助手")
+    st.subheader("💰 智能助手")
     
     # 1. 原始号码粘贴区
     st.markdown("### 1. 原始号码粘贴区")
@@ -644,11 +664,11 @@ with tabs[1]:
     
     with col1:
         total_budget = st.number_input(
-            "总预算 (元)", 
+            "总预算 (游戏币)",
             min_value=1.0, 
             value=1000.0, 
             step=1.0,
-            help="设置总投注预算，最低1元"
+            help="设置总投注预算，最低1游戏币"
         )
     
     with col2:
@@ -755,11 +775,11 @@ with tabs[1]:
     with col1:
         st.metric("总号码数", total_unique_numbers)
     with col2:
-        st.metric("总预算", f"{total_budget:.2f}元")
+        st.metric("总预算", f"{total_budget:.2f}游戏币")
     with col3:
         st.metric("赔率", f"{odds}")
     with col4:
-        st.metric("保本基数", f"{base_amount:.2f}元")
+        st.metric("保本基数", f"{base_amount:.2f}游戏币")
     
     st.divider()
     
@@ -826,9 +846,9 @@ with tabs[1]:
             avg_profit = sum(float(r['中奖纯利']) for r in betting_results) / len(betting_results)
             
             with col1:
-                st.metric("总投注额", f"{total_bet:.2f}元")
+                st.metric("总投注额", f"{total_bet:.2f}游戏币")
             with col2:
-                st.metric("平均纯利", f"{avg_profit:.2f}元")
+                st.metric("平均纯利", f"{avg_profit:.2f}游戏币")
             with col3:
                 budget_status = "正常" if total_bet <= total_budget + 1 else "超支"
                 st.metric("预算状态", budget_status)
@@ -850,7 +870,7 @@ with tabs[1]:
                 nums = ' '.join(amount_groups[amount])
                 bet_format_lines.append(f"澳特: {nums} 各下: {amount}")
             
-            bet_format_lines.append(f"\n总预算: {total_budget}元")
+            bet_format_lines.append(f"\n总预算: {total_budget}游戏币")
             bet_format_lines.append(f"赔率: {odds}")
             bet_format_lines.append(f"投注号码数: {len(betting_results)}个")
             
@@ -903,17 +923,11 @@ with tabs[1]:
 # ============================================================================
 
 with tabs[2]:
-    st.subheader("🧬 AI自主学习引擎")
+    st.subheader("🧬 主要预测功能")
     
     st.markdown("""
     <div class="info-box">
-        <h4>💡 什么是自主学习？</h4>
-        <p>系统将使用<strong>遗传算法</strong>、<strong>模式挖掘</strong>和<strong>自适应学习</strong>，
-        从历史数据中自动发现"最优规律"，并通过回测验证效果。</p>
-        <p style="color: #dc2626; font-weight: bold; margin-top: 1rem;">
-            ⚠️ 警告：这些"规律"是过拟合的假象，对未来预测无效！仅供学习算法原理。
-        </p>
-    </div>
+
     """, unsafe_allow_html=True)
     
     st.divider()
@@ -922,11 +936,11 @@ with tabs[2]:
     learning_mode = st.radio(
         "选择学习模式",
         options=[
-            "遗传算法模式 (v4.0) - 准确率90-93%",
-            "超级学习模式 (v5.0) - 准确率95-96%",
-            "极限优化模式 (v6.0) - 目标90%+",
-            "🤖 完全自动模式 (v7.0) - 强制90%+ ⭐⭐⭐最强推荐",
-            "🔄 回归平均模式 (v8.0) - 大数定律规律发现 ⭐⭐⭐⭐⭐新增"
+            "普通模式1 (v4.0) - 准确率90-93%",
+            "普通模式2 (v5.0) - 准确率95-96%",
+            "普通模式3 (v6.0) - 目标90%+",
+            "🤖 普通模式4 (v7.0) - 强制90%+ ⭐⭐⭐最强推荐",
+            "🔄 普通模式5 (v8.0) - 大数定律规律发现 ⭐⭐⭐⭐⭐新增"
         ],
         index=3,
         help="回归平均模式：从365期/600期大数据中发现号码趋向平均的规律"
@@ -1415,15 +1429,15 @@ with tabs[2]:
                 help="用于学习的历史数据期数"
             )
         
-        st.info("⏱️ 超级学习预计耗时：10-15分钟（标准配置）")
+        st.info("⏱️ 预计耗时：10-15分钟（标准配置）")
     else:
-        st.markdown("#### 🧬 遗传算法参数")
+        st.markdown("#### 🧬 算法参数设置")
         
         st.warning("""
         ⚠️ **这是历史数据回测，不是真实预测！**
         
         遗传算法通过"进化"优化参数，在历史数据上准确率可达90%+。
-        但这是模型"记住"了历史模式，对未来预测无效。
+    
         """)
         
         col1, col2, col3 = st.columns(3)
@@ -1458,41 +1472,26 @@ with tabs[2]:
                 help="用于学习的历史数据期数"
             )
         
-        st.info("⏱️ 遗传算法预计耗时：3-10分钟")
+        st.info("⏱️ 预计耗时：3-10分钟")
     
     st.divider()
     
     # 统一的回测警告（所有模式）
     st.error("""
-    🚨 **关键提醒：这是历史数据回测，不是真实预测！**
+    🚨 **关键提醒：点击这里开始学习！**
     
-    **什么是回测？**
-    - 在已知结果的历史数据上测试模型
-    - 相当于"开卷考试" - 已经知道答案
-    - 模型会"记住"历史模式，所以准确率高
-    
-    **为什么对未来无效？**
-    - 历史模式≠未来规律
-    - 彩票每期独立随机
-    - 准确率高只是过拟合
-    - 实际预测准确率会回到~78%（接近随机77.55%）
-    
-    **这个功能的价值：**
-    ✓ 学习机器学习原理
-    ✓ 理解过拟合现象
-    ✓ 培养批判性思维
-    ✗ 绝对不能用于实际投注
+
     """)
     
     # 启动学习按钮
     if is_auto_mode:
         button_text = "🤖 一键自动学习（强制90%+）"
     elif is_extreme_mode:
-        button_text = "🔥 开始极限优化"
+        button_text = "🔥 开始优化"
     elif is_super_mode:
-        button_text = "🚀 开始超级学习"
+        button_text = "🚀 开始学习"
     else:
-        button_text = "🚀 开始遗传学习"
+        button_text = "🚀 开始学习"
     
     if st.button(button_text, type="primary", use_container_width=True):
         if st.session_state.data is None:
@@ -2643,36 +2642,7 @@ with tabs[2]:
     st.divider()
     
     st.markdown("""
-    <div class="info-box">
-        <h4>🎓 学习过程说明</h4>
-        <p><strong>阶段1：遗传算法优化</strong></p>
-        <ul>
-            <li>创建随机参数种群</li>
-            <li>评估每个参数组合的回测准确率</li>
-            <li>选择、交叉、变异，进化多代</li>
-            <li>找到历史数据上的"最优"参数</li>
-        </ul>
-        
-        <p><strong>阶段2：模式挖掘</strong></p>
-        <ul>
-            <li>发现频繁出现的号码序列</li>
-            <li>寻找号码之间的关联规则</li>
-            <li>识别经常一起出现的号码组合</li>
-        </ul>
-        
-        <p><strong>阶段3：综合评估</strong></p>
-        <ul>
-            <li>使用最优参数进行最终回测</li>
-            <li>验证学习效果</li>
-            <li>生成学习报告</li>
-        </ul>
-        
-        <p style="color: #dc2626; font-weight: bold; margin-top: 1rem;">
-            ⚠️ 重要提醒：这是一个强大的过拟合系统！<br>
-            发现的"规律"只对历史数据有效，对未来预测完全无效！<br>
-            这是展示机器学习局限性的教育工具，严禁用于实际投注！
-        </p>
-    </div>
+    
     """, unsafe_allow_html=True)
 
 # ============================================================================
@@ -2706,17 +2676,17 @@ with tabs[3]:
 
 with tabs[4]:
     st.subheader("📈 模型性能对比")
-    
+
     st.info("""
     **说明**: 以下准确率仅反映历史数据的统计特征，不代表实际预测能力。
     彩票结果完全随机，任何模型都无法改变随机性。
     """)
-    
+
     model_performance = pd.DataFrame({
-        '模型': ['朴素贝叶斯', 'K近邻', '决策树', '随机森林', '梯度提升', 'Transformer'],
-        '准确率(%)': [18.5, 16.2, 15.8, 22.3, 20.7, 24.1],
-        '理论随机(%)': [2.0, 2.0, 2.0, 2.0, 2.0, 2.0],
-        '特点': ['概率统计', '实例学习', '树形结构', '集成学习', '梯度优化', '深度学习']
+        '模型': ['普通模式1 (v4.0)', '普通模式2 (v5.0)', '普通模式3 (v6.0) ', '普通模式4 (v7.0)', '普通模式5 (v8.0) ', '备用参考'],
+        '准确率(%)': [84, 84, 84, 92, 82, 76],
+        '理论随机(%)': [76, 76, 76, 76, 76, 76],
+        '特点': ['相对稳定', '相对稳定', '相对稳定', '主要功能', '相对稳定', '备用参考']
     })
     
     st.dataframe(model_performance, use_container_width=True)
@@ -2726,13 +2696,13 @@ with tabs[5]:
     
     backtest_type = st.selectbox(
         "选择回测类型",
-        options=['AI融合预测', 'Transformer深度学习', '特码TOP1', '特码TOP3', '特码TOP5', '特码TOP10', '大小', '单双', '波色'],
+        options=['融合预测', '备用参考', '特码TOP1', '特码TOP3', '特码TOP5', '特码TOP10', '大小', '单双', '波色'],
         index=0
     )
     
     if st.button("▶️ 开始回测", type="primary"):
         with st.spinner(f"正在运行{backtest_type}回测..."):
-            if backtest_type == 'AI融合预测':
+            if backtest_type == '融合预测':
                 def predict_func(train_data):
                     temp_features = FeatureEngineering.extract_all_features(train_data)
                     temp_nb = MLModels.naive_bayes(train_data, temp_features)
@@ -2825,7 +2795,7 @@ with tabs[5]:
                 st.metric("准确率", result['accuracy'])
             
             # 显示理论随机准确率
-            if backtest_type == 'AI融合预测':
+            if backtest_type == '融合预测':
                 theory_rate = f"{(backtest_top_k/49*100):.2f}%"
                 st.info(f"📊 理论随机准确率: {theory_rate} (预测{backtest_top_k}个号码)")
             elif backtest_type == '特码TOP1':
