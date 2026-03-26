@@ -46,18 +46,40 @@ import re
 from collections import defaultdict
 warnings.filterwarnings('ignore')
 
-# 1. 必须是第一个 Streamlit 命令
-st.set_page_config(page_title="我的应用", layout="wide")
+import streamlit as st
 
-# 2. 紧接着放入隐藏样式的代码
+# 必须放在脚本最前面
+st.set_page_config(page_title="我的应用")
+
+# 针对新版本 Streamlit 的全能隐藏样式
 hide_streamlit_style = """
     <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    .stAppDeployButton {display: none;}
+    /* 隐藏右上角 Deploy 按钮 */
+    .stAppDeployButton {
+        display: none !important;
+    }
+
+    /* 隐藏右上角 汉堡菜单 (三个点) */
+    #MainMenu, [data-testid="stHeader"] {
+        display: none !important;
+    }
+
+    /* 隐藏右下角/底部 页脚 (Made with Streamlit) */
+    footer {
+        visibility: hidden !important;
+        height: 0px !important;
+    }
+
+    /* 针对开发模式下的特殊浮动按钮 */
+    .stAppToolbar {
+        display: none !important;
+    }
     </style>
 """
+
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
+
 
 # 导入登录系统
 from login_interface import require_login, show_user_management, is_admin
