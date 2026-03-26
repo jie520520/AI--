@@ -46,6 +46,19 @@ import re
 from collections import defaultdict
 warnings.filterwarnings('ignore')
 
+# 1. 必须是第一个 Streamlit 命令
+st.set_page_config(page_title="我的应用", layout="wide")
+
+# 2. 紧接着放入隐藏样式的代码
+hide_streamlit_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    .stAppDeployButton {display: none;}
+    </style>
+"""
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
 # 导入登录系统
 from login_interface import require_login, show_user_management, is_admin
 
