@@ -12,7 +12,7 @@ def show_login_page():
     """显示登录页面"""
     st.markdown("""
     <div style="text-align: center; padding: 50px 0 30px 0;">
-        <h1>🔐 AI彩票量化研究系统</h1>
+        <h1>🔐 量化研究系统</h1>
         <h3>内部测试版 - 用户登录</h3>
     </div>
     """, unsafe_allow_html=True)
