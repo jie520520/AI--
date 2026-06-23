@@ -11,10 +11,14 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
 # Incorrect (Inconsistent spaces or mixed tabs/spaces causing IndentationError)
+# Correct (Clean, consistent 4-space indentation)
 from lottery_core import (
     extract_all_features,
-      omission_features, 
+    omission_features,
 )
+
+# Alternative (Flatten it to completely bypass indentation issues):
+from lottery_core import extract_all_features, omission_features
 
 # Correct (Clean, consistent 4-space indentation)
 from lottery_core import (
