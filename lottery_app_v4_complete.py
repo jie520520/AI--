@@ -2788,16 +2788,19 @@ with tabs[7]:
     st.subheader(f"特码走势图（最近{trend_periods}期）")
     recent_trend = st.session_state.data[['期号', '特码']].iloc[-trend_periods:]
 
-    fig = px.line(
-        recent_trend,
+# 在绘图前，提取出干净的子集并重置索引，防止索引带来的数组干扰
+plot_df = recent_trend[['期号', '特码']].copy().reset_index(drop=True)
+
+fig = px.line(
+        plot_df,
         x='期号',
         y='特码',
         title='',
         markers=True
     )
-    fig.update_layout(height=400)
-    fig.update_traces(line_color='#3b82f6', marker=dict(size=8, color='#ec4899'))
-    st.plotly_chart(fig, use_container_width=True)
+fig.update_layout(height=400)
+fig.update_traces(line_color='#3b82f6', marker=dict(size=8, color='#ec4899'))
+st.plotly_chart(fig, use_container_width=True)
 
 # ============================================================================
 # 页脚
