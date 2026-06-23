@@ -10,24 +10,10 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
-# Incorrect (Inconsistent spaces or mixed tabs/spaces causing IndentationError)
-# Correct (Clean, consistent 4-space indentation)
 from lottery_core import (
-    extract_all_features,
-    omission_features,
+    DataProcessor, FeatureEngineering, MLModels, 
+    TransformerModel, EnsembleFusion, BacktestEngine
 )
-
-# Alternative (Flatten it to completely bypass indentation issues):
-from lottery_core import extract_all_features, omission_features
-
-# Correct (Clean, consistent 4-space indentation)
-from lottery_core import (
-    extract_all_features,
-    omission_features,
-)
-
-# Alternative (Flatten it to completely bypass indentation issues):
-from lottery_core import extract_all_features, omission_features
 from lottery_core_enhanced import (
     AuxiliaryPredictor, AuxiliaryBacktest,
     EnhancedPredictionEngine, HistoryViewer,
@@ -2802,19 +2788,16 @@ with tabs[7]:
     st.subheader(f"特码走势图（最近{trend_periods}期）")
     recent_trend = st.session_state.data[['期号', '特码']].iloc[-trend_periods:]
 
-# 在绘图前，提取出干净的子集并重置索引，防止索引带来的数组干扰
-plot_df = recent_trend[['期号', '特码']].copy().reset_index(drop=True)
-
-fig = px.line(
-        plot_df,
+    fig = px.line(
+        recent_trend,
         x='期号',
         y='特码',
         title='',
         markers=True
     )
-fig.update_layout(height=400)
-fig.update_traces(line_color='#3b82f6', marker=dict(size=8, color='#ec4899'))
-st.plotly_chart(fig, use_container_width=True)
+    fig.update_layout(height=400)
+    fig.update_traces(line_color='#3b82f6', marker=dict(size=8, color='#ec4899'))
+    st.plotly_chart(fig, use_container_width=True)
 
 # ============================================================================
 # 页脚
