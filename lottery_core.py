@@ -240,7 +240,14 @@ class FeatureEngineering:
         last_seen = [-1] * 49
         
         for idx, num in enumerate(data['特码'].values):
-            last_seen[int(num) - 1] = idx
+            # Insert this right above line 243 to see what 'num' actually contains
+try:
+    num_int = int(num)
+except Exception as e:
+    print(f"Failed to convert num to int. Type: {type(num)}, Value: {num}")
+    raise e
+
+last_seen[num_int - 1] = idx
         
         for num in range(49):
             if last_seen[num] == -1:
