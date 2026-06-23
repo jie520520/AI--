@@ -240,7 +240,7 @@ class FeatureEngineering:
         last_seen = [-1] * 49
         
         for idx, num in enumerate(data['特码'].values):
-            last_seen[num - 1] = idx
+            last_seen[int(num) - 1] = idx
         
         for num in range(49):
             if last_seen[num] == -1:
